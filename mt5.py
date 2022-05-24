@@ -11,7 +11,7 @@ from data import (
     get_dataset_tokenized,
     sacrebleu_metric,
     slowtokenizer_batch_decode,
-    tokenizer,
+    t5tokenizer,
 )
 from accelerate import Accelerator
 import torch
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         default="google/mt5-small",
-        help="Finetune from google/mt5-small or load finetuned results/final",
+        help="Finetune from google/mt5-small or load finetuned results-mt5/final",
     )
     parser.add_argument("--eval", action="store_true")
     parser.add_argument("--test", action="store_true")
@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
     # zh_train, zh_val, zh_test, en_train, en_val, en_test = get_dataset()
 
-    # tokenizer = T5Tokenizer.from_pretrained("google/mt5-small")
+    # t5tokenizer = T5Tokenizer.from_pretrained("google/mt5-small")
     model = AutoModelForSeq2SeqLM.from_pretrained(args.model)
 
     zhtrain_encodings, entrain_encodings = get_dataset_tokenized("train")
@@ -59,10 +59,10 @@ if __name__ == "__main__":
     trainset = WMT20(zhtrain_encodings, entrain_encodings)
     valset = WMT20(zhval_encodings, enval_encodings)
 
-    data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
+    data_collator = DataCollatorForSeq2Seq(tokenizer=t5tokenizer, model=model)
 
     training_args = Seq2SeqTrainingArguments(
-        output_dir="./results",
+        output_dir="./results-mt5",
         evaluation_strategy="no",
         learning_rate=2e-5,
         per_device_train_batch_size=32,
@@ -81,7 +81,7 @@ if __name__ == "__main__":
         args=training_args,
         train_dataset=trainset,
         eval_dataset=valset,
-        tokenizer=tokenizer,
+        tokenizer=t5tokenizer,
         data_collator=data_collator,
     )
 
@@ -112,7 +112,7 @@ if __name__ == "__main__":
                     targets_gathered = torch.where(
                         targets_gathered != -100,
                         targets_gathered,
-                        tokenizer.pad_token_id,
+                        t5tokenizer.pad_token_id,
                     ).cpu()
 
                     decoded_preds = [
@@ -135,7 +135,7 @@ if __name__ == "__main__":
                             print(decoded_labels[idx - 1], decoded_labels[idx + 1])
                             assert 0, (
                                 decoded_preds[idx],
-                                tokenizer.decode(inputs["input_ids"][idx]),
+                                t5tokenizer.decode(inputs["input_ids"][idx]),
                             )
 
                     sacrebleu_metric.add_batch(
@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
     if args.train:
         trainer.train()
-        model.save_pretrained("results/final")
+        model.save_pretrained("results-mt5/final")
     if args.eval:
         eval_process(model, valset)
         # print(trainer.evaluate())
@@ -161,10 +161,10 @@ if __name__ == "__main__":
         while True:
             x = input("> ")
             x = EN_PREFIX + x
-            x = tokenizer(
+            x = t5tokenizer(
                 x, max_length=128, truncation=True, return_tensors="pt"
             ).input_ids.to(device)
             print(x)
             result = model.generate(x)
             print(result)
-            print(tokenizer.decode(result[0], skip_special_tokens=True))
+            print(t5tokenizer.decode(result[0], skip_special_tokens=True))
