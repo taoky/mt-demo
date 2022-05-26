@@ -1,5 +1,5 @@
 import math
-from data import EOS_IDX, get_dataset_tokenized, PAD_IDX, BOS_IDX
+from data import EOS_IDX, get_dataset_tokenized, PAD_IDX, BOS_IDX, sacrebleu_metric
 
 import argparse
 import torch
@@ -131,8 +131,8 @@ def get_model(input_dim, output_dim, device):
     DEC_EMB_DIM = 256
     HID_DIM = 512
     N_LAYERS = 2
-    ENC_DROPOUT = 0.5
-    DEC_DROPOUT = 0.5
+    ENC_DROPOUT = 0.2
+    DEC_DROPOUT = 0
     enc = Encoder(input_dim, ENC_EMB_DIM, HID_DIM, N_LAYERS, ENC_DROPOUT)
     dec = Decoder(output_dim, DEC_EMB_DIM, HID_DIM, N_LAYERS, DEC_DROPOUT)
     model = Seq2Seq(enc, dec, device).to(device)
@@ -188,18 +188,18 @@ def main(args):
         output_dim=zhtokenizer.get_vocab_size(),
         device=device,
     )
+    criterion = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
     if args.model:
         model.load_state_dict(torch.load(args.model))
 
     if args.train:
         optimizer = optim.Adam(model.parameters())
-        criterion = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
 
         model.train()
 
         use_amp = True
         scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
-        epochs = 1
+        epochs = 3
         steps = 0
         for _ in range(epochs):
             for i, batch in enumerate(tqdm(trainloader)):
@@ -232,6 +232,63 @@ def main(args):
                     torch.save(checkpoint, f"results-s2s/checkpoint-{steps}.pt")
 
         torch.save(model.state_dict(), "results-s2s/model.pt")
+
+    def eval_process(dataloader):
+        model.eval()
+        eval_loss = 0
+        batches = 0
+        with torch.no_grad():
+            for i, batch in enumerate(tqdm(dataloader)):
+                src = batch[1].to(device)
+                trg = batch[0].to(device)
+                output = model(src, trg, 0)
+
+                output_dim = output.shape[-1]
+                output_c = output[1:].view(-1, output_dim)
+                trg_c = trg[1:].view(-1)
+                loss = criterion(output_c, trg_c)
+
+                # print(output.size(), trg.size())
+
+                _, topi = output.topk(1)
+                topi = topi.squeeze()
+
+                output = zhtokenizer.decode_batch(topi.T.tolist())
+                target = [[i] for i in zhtokenizer.decode_batch(trg.T.tolist())]
+                # print(output, target)
+
+                sacrebleu_metric.add_batch(
+                    predictions=output, references=target
+                )
+
+                eval_loss += loss.item()
+                batches += 1
+        eval_loss /= batches
+        results = sacrebleu_metric.compute()["score"]
+        print("Sacre BLEU: ", results)
+
+    if args.eval:
+        evalset = WMT20(zhval_encodings, enval_encodings)
+        evalloader = DataLoader(
+            evalset,
+            batch_size=512,
+            collate_fn=collate_batch,
+            num_workers=16,
+            pin_memory=True,
+        )
+        eval_process(evalloader)
+    
+    if args.test:
+        zhtest_encodings, entest_encodings = get_dataset_tokenized("test", model="naive")
+        testset = WMT20(zhtest_encodings, entest_encodings)
+        testloader = DataLoader(
+            testset,
+            batch_size=512,
+            collate_fn=collate_batch,
+            num_workers=16,
+            pin_memory=True,
+        )
+        eval_process(testloader) 
     if args.interactive:
         # import spacy
 
@@ -239,18 +296,21 @@ def main(args):
         with torch.no_grad():
             while True:
                 x = input("> ")
-                x = [i.text for i in entokenizer(x)]
+                # x = [i.text for i in entokenizer(x)]
                 # x = torch.tensor(en_transform(x), device=device).unsqueeze(0).T
-                x = torch.tensor(entokenizer(x).ids, device=device).unsqueeze(0).T
+                x = entokenizer.encode(x).ids
+                x = transform(x).to(device).unsqueeze(0).T
                 print(x)
                 output = model(x, torch.tensor([[BOS_IDX] * 128], device=device).T, 0)
                 output = output[1:]
                 _, topi = output.topk(1)
+                # print(topi)
+                sentence_ids = []
                 for i in topi:
-                    word = zhtokenizer.decode(i)
-                    print(word)
-                    if word == "<eos>":
+                    if i == EOS_IDX:
                         break
+                    sentence_ids.append(i)
+                print(zhtokenizer.decode(sentence_ids))
 
 
 if __name__ == "__main__":
