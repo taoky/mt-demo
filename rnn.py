@@ -191,13 +191,22 @@ def main(args):
     criterion = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
     if args.model:
         model.load_state_dict(torch.load(args.model))
+    else:
+        def init_weights(m):
+            for name, param in m.named_parameters():
+                if 'weight' in name:
+                    nn.init.normal_(param.data, mean=0, std=0.01)
+                else:
+                    nn.init.constant_(param.data, 0)
 
+        model.apply(init_weights)
     if args.train:
+        # text degeneration problem?
         optimizer = optim.Adam(model.parameters())
 
         model.train()
 
-        use_amp = True
+        use_amp = False
         scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
         epochs = 3
         steps = 0
@@ -229,9 +238,9 @@ def main(args):
                         "optimizer": optimizer.state_dict(),
                         "scaler": scaler.state_dict(),
                     }
-                    torch.save(checkpoint, f"results-s2s/checkpoint-{steps}.pt")
+                    torch.save(checkpoint, f"results-rnn/checkpoint-{steps}.pt")
 
-        torch.save(model.state_dict(), "results-s2s/model.pt")
+        torch.save(model.state_dict(), "results-rnn/model.pt")
 
     def eval_process(dataloader):
         model.eval()
@@ -314,7 +323,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser("mt5 finetune")
+    parser = argparse.ArgumentParser("rnn(gru) seq2seq")
     parser.add_argument("--train", action="store_true")
     parser.add_argument("--model", help="load an existing model")
     parser.add_argument("--eval", action="store_true")
