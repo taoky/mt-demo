@@ -192,9 +192,10 @@ def main(args):
     if args.model:
         model.load_state_dict(torch.load(args.model))
     else:
+
         def init_weights(m):
             for name, param in m.named_parameters():
-                if 'weight' in name:
+                if "weight" in name:
                     nn.init.normal_(param.data, mean=0, std=0.01)
                 else:
                     nn.init.constant_(param.data, 0)
@@ -266,14 +267,13 @@ def main(args):
                 target = [[i] for i in zhtokenizer.decode_batch(trg.T.tolist())]
                 # print(output, target)
 
-                sacrebleu_metric.add_batch(
-                    predictions=output, references=target
-                )
+                sacrebleu_metric.add_batch(predictions=output, references=target)
 
                 eval_loss += loss.item()
                 batches += 1
         eval_loss /= batches
         results = sacrebleu_metric.compute()["score"]
+        print("Loss: ", eval_loss)
         print("Sacre BLEU: ", results)
 
     if args.eval:
@@ -286,9 +286,11 @@ def main(args):
             pin_memory=True,
         )
         eval_process(evalloader)
-    
+
     if args.test:
-        zhtest_encodings, entest_encodings = get_dataset_tokenized("test", model="naive")
+        zhtest_encodings, entest_encodings = get_dataset_tokenized(
+            "test", model="naive"
+        )
         testset = WMT20(zhtest_encodings, entest_encodings)
         testloader = DataLoader(
             testset,
@@ -297,7 +299,7 @@ def main(args):
             num_workers=16,
             pin_memory=True,
         )
-        eval_process(testloader) 
+        eval_process(testloader)
     if args.interactive:
         # import spacy
 
