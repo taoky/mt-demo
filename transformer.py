@@ -93,12 +93,17 @@ class Seq2SeqTransformer(nn.Module):
 
     def encode(self, src, src_mask, src_key_padding_mask=None):
         return self.transformer.encoder(
-            self.positional_encoding(self.src_tok_emb(src)), src_mask, src_key_padding_mask=src_key_padding_mask
+            self.positional_encoding(self.src_tok_emb(src)),
+            src_mask,
+            src_key_padding_mask=src_key_padding_mask,
         )
 
     def decode(self, tgt, memory, tgt_mask, memory_key_padding_mask=None):
         return self.transformer.decoder(
-            self.positional_encoding(self.tgt_tok_emb(tgt)), memory, tgt_mask, memory_key_padding_mask=memory_key_padding_mask
+            self.positional_encoding(self.tgt_tok_emb(tgt)),
+            memory,
+            tgt_mask,
+            memory_key_padding_mask=memory_key_padding_mask,
         )
 
 
@@ -243,7 +248,9 @@ def main(args):
 
         torch.save(model.state_dict(), "results-transformer/model.pt")
 
-    def greedy_decode(model, src, src_mask, max_len, start_symbol, device, src_key_padding_mask=None):
+    def greedy_decode(
+        model, src, src_mask, max_len, start_symbol, device, src_key_padding_mask=None
+    ):
         src = src.to(device)
         src_mask = src_mask.to(device)
 
@@ -256,7 +263,9 @@ def main(args):
                 torch.bool
             )
             # print(ys.size(), memory.size(), tgt_mask.size())
-            out = model.decode(ys, memory, tgt_mask, memory_key_padding_mask=src_key_padding_mask)
+            out = model.decode(
+                ys, memory, tgt_mask, memory_key_padding_mask=src_key_padding_mask
+            )
             out = out.transpose(0, 1)
             prob = model.generator(out[:, -1])
             _, next_word = torch.max(prob, dim=1)
@@ -312,7 +321,7 @@ def main(args):
                             max_len=128,
                             start_symbol=BOS_IDX,
                             device=device,
-                            src_key_padding_mask=src_padding_mask
+                            src_key_padding_mask=src_padding_mask,
                         )
                         .flatten()
                         .tolist()
@@ -327,10 +336,8 @@ def main(args):
             eval_loss /= batches
             print("Loss: ", eval_loss)
 
-
             results = sacrebleu_metric.compute()["score"]
             print("Sacre BLEU: ", results)
-        
 
     if args.eval:
         evalset = WMT20(zhval_encodings, enval_encodings)

@@ -11,7 +11,7 @@ from tokenizers import normalizers
 from tokenizers.normalizers import NFD, StripAccents, Lowercase
 from tokenizers.decoders import ByteLevel as ByteLevelDecoder
 
-EN_PREFIX = "translate English to Chinese: "
+# EN_PREFIX = "translate English to Chinese: "
 bleu_metric = datasets.load_metric("bleu")
 sacrebleu_metric = datasets.load_metric("sacrebleu")
 t5tokenizer = T5Tokenizer.from_pretrained("google/mt5-small")
@@ -37,10 +37,11 @@ def get_custom_tokenizer(lang):
 
 
 def get_dataset_raw(with_prefix=True):
-    if with_prefix:
-        prefix = EN_PREFIX
-    else:
-        prefix = ""
+    # prefix is unnecessary in MT5 single task finetune
+    # if with_prefix:
+    #     prefix = EN_PREFIX
+    # else:
+    #     prefix = ""
     zh_sentences, en_sentences = [], []
     files = [
         "news-commentary-v15.en-zh.tsv",
@@ -55,7 +56,8 @@ def get_dataset_raw(with_prefix=True):
                 zh = zh.strip()
                 if len(en) != 0 and len(zh) != 0:
                     zh_sentences.append(zh)
-                    en_sentences.append(prefix + en)
+                    # en_sentences.append(prefix + en)
+                    en_sentences.append(en)
 
     zh_train, zh_test, en_train, en_test = train_test_split(
         zh_sentences,

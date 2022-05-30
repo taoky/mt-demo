@@ -5,9 +5,9 @@ from transformers import (
     Seq2SeqTrainer,
 )
 from data import (
-    EN_PREFIX,
+    # EN_PREFIX,
     get_dataset_tokenized,
-    bleu_metric,
+    # bleu_metric,
     get_dataset_tokenized,
     sacrebleu_metric,
     slowtokenizer_batch_decode,
@@ -66,10 +66,11 @@ if __name__ == "__main__":
         evaluation_strategy="no",
         learning_rate=2e-5,
         per_device_train_batch_size=32,
-        per_device_eval_batch_size=2048,
+        per_device_eval_batch_size=64,
+        # per_device_eval_batch_size=32,
         weight_decay=0.01,
         save_total_limit=3,
-        num_train_epochs=1,
+        num_train_epochs=3,
         logging_steps=100,
         save_steps=2500,
         # eval_accumulation_steps=8,
@@ -87,21 +88,24 @@ if __name__ == "__main__":
 
     def eval_process(model, dataset):
         accelerator = Accelerator()
+        # batch size here can be higher than per_device_eval_batch_size
+        # as we don't need to cal loss here
         dataloader = DataLoader(
             dataset,
-            batch_size=training_args.per_device_eval_batch_size,
+            batch_size=2048,
             collate_fn=data_collator,
         )
         model, dataloader = accelerator.prepare(model, dataloader)
         model.eval()
         # sentencepiece is too slow as it only uses one core
         # so we have to create a multiprocess pool here
-        multiprocessing.set_start_method("fork")
-        with multiprocessing.Pool() as pool:
+        with multiprocessing.get_context("fork").Pool() as pool:
             with torch.no_grad():
                 for inputs in tqdm(dataloader):
                     generated_tokens = model.generate(
-                        inputs["input_ids"], attention_mask=inputs["attention_mask"]
+                        inputs["input_ids"],
+                        attention_mask=inputs["attention_mask"],
+                        max_length=128,
                     )
                     targets = inputs["labels"]
                     # Gather all predictions and targets
@@ -137,6 +141,11 @@ if __name__ == "__main__":
                                 decoded_preds[idx],
                                 t5tokenizer.decode(inputs["input_ids"][idx]),
                             )
+                    # print(inputs["attention_mask"])
+                    # print([t5tokenizer.decode(x) for x in inputs["input_ids"]])
+                    # print(decoded_preds)
+                    # print(decoded_labels)
+                    # input()
 
                     sacrebleu_metric.add_batch(
                         predictions=decoded_preds, references=decoded_labels
@@ -148,23 +157,27 @@ if __name__ == "__main__":
         trainer.train()
         model.save_pretrained("results-mt5/final")
     if args.eval:
+        # get loss
+        print(trainer.evaluate())
+        # get bleu
         eval_process(model, valset)
-        # print(trainer.evaluate())
     if args.test:
         zhtest_encodings, entest_encodings = get_dataset_tokenized("test")
         testset = WMT20(zhtest_encodings, entest_encodings)
+        # get loss
+        print(trainer.evaluate(testset))
+        # get bleu
         eval_process(model, testset)
-        # trainer.predict(testset)
     if args.interactive:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
         model.to(device)
         while True:
             x = input("> ")
-            x = EN_PREFIX + x
+            x = "translate English to Chinese: " + x
             x = t5tokenizer(
                 x, max_length=128, truncation=True, return_tensors="pt"
             ).input_ids.to(device)
             print(x)
-            result = model.generate(x)
+            result = model.generate(x, max_length=128)
             print(result)
             print(t5tokenizer.decode(result[0], skip_special_tokens=True))
