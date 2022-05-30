@@ -70,7 +70,7 @@ if __name__ == "__main__":
         # per_device_eval_batch_size=32,
         weight_decay=0.01,
         save_total_limit=3,
-        num_train_epochs=3,
+        num_train_epochs=5,
         logging_steps=100,
         save_steps=2500,
         # eval_accumulation_steps=8,
@@ -173,7 +173,7 @@ if __name__ == "__main__":
         model.to(device)
         while True:
             x = input("> ")
-            x = "translate English to Chinese: " + x
+            # x = "translate English to Chinese: " + x
             x = t5tokenizer(
                 x, max_length=128, truncation=True, return_tensors="pt"
             ).input_ids.to(device)
