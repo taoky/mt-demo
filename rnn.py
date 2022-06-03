@@ -195,7 +195,9 @@ def main(args):
 
         def init_weights(m):
             for name, param in m.named_parameters():
-                if "weight" in name:
+                if "gru" in name and "weight" in name:
+                    nn.init.orthogonal_(param.data)
+                elif "weight" in name:
                     nn.init.normal_(param.data, mean=0, std=0.01)
                 else:
                     nn.init.constant_(param.data, 0)
@@ -209,7 +211,7 @@ def main(args):
 
         use_amp = False
         scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
-        epochs = 3
+        epochs = 5
         steps = 0
         for _ in range(epochs):
             for i, batch in enumerate(tqdm(trainloader)):
