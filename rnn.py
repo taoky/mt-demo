@@ -273,7 +273,7 @@ def main(args):
                 eval_loss += loss.item()
                 batches += 1
         eval_loss /= batches
-        results = sacrebleu_metric.compute()["score"]
+        results = sacrebleu_metric.compute(tokenize='zh')["score"]
         print("Loss: ", eval_loss)
         print("Sacre BLEU: ", results)
 

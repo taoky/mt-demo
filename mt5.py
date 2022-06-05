@@ -150,7 +150,7 @@ if __name__ == "__main__":
                     sacrebleu_metric.add_batch(
                         predictions=decoded_preds, references=decoded_labels
                     )
-        results = sacrebleu_metric.compute()["score"]
+        results = sacrebleu_metric.compute(tokenize='zh')["score"]
         print("Sacre BLEU: ", results)
 
     if args.train:

@@ -335,14 +335,14 @@ def main(args):
             eval_loss /= batches
             print("Loss: ", eval_loss)
 
-            results = sacrebleu_metric.compute()["score"]
+            results = sacrebleu_metric.compute(tokenize='zh')["score"]
             print("Sacre BLEU: ", results)
 
     if args.eval:
         evalset = WMT20(zhval_encodings, enval_encodings)
         evalloader = DataLoader(
             evalset,
-            batch_size=64,
+            batch_size=512,
             collate_fn=collate_batch,
             num_workers=16,
             pin_memory=True,
