@@ -85,14 +85,13 @@ class Decoder(nn.Module):
         self.out = nn.Linear(hidden_size * 2, output_size)
 
     def forward(self, input, last_hidden, encoder_outputs):
-        # Get the embedding of the current input word (last output word)
         embedded = self.embed(input).unsqueeze(0)  # (1,B,N)
         embedded = self.dropout(embedded)
-        # Calculate attention weights and apply to encoder outputs
+
         attn_weights = self.attention(last_hidden[-1], encoder_outputs)
         context = attn_weights.bmm(encoder_outputs.transpose(0, 1))  # (B,1,N)
         context = context.transpose(0, 1)  # (1,B,N)
-        # Combine embedded input word and attended context, run through RNN
+
         rnn_input = torch.cat([embedded, context], 2)
         output, hidden = self.gru(rnn_input, last_hidden)
         output = output.squeeze(0)  # (1,B,N) -> (B,N)
