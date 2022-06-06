@@ -20,9 +20,19 @@ protobuf
 tqdm
 ```
 
+## 获取数据集
+
+实验使用的数据集需要前往 <https://statmt.org/wmt20/translation-task.html> 下载，放置于 data 目录中。每个数据集可能需要解压缩，共包含以下文件：
+
+- news-commentary-v15.en-zh.tsv
+- wikititles-v2.zh-en.tsv
+- WikiMatrix.v1.en-zh.langid.tsv
+
+后两者放于 data/wiki 目录后，执行 data 下的 wikiconvert.py 文件生成简体数据集。
+
 ## 预处理
 
-下载数据后，使用 wikiconvert.py 进行简繁转换，然后以下命令生成预处理数据集和 tokenizer：
+使用以下命令生成预处理数据集和 tokenizer：
 
 ```console
 python data.py --t5  # MT5 相关预处理
@@ -56,3 +66,7 @@ python rnn.py --model results-rnn/model.pt --interactive
 python transformer.py --model results-transformer/model.pt --interactive
 python mt5.py --model results-mt5/final --interactive
 ```
+
+## 绘制 train loss 变化曲线
+
+参考 graph.py，注意需要在训练时重定向脚本的 stdout 和 stderr 到文件中。
